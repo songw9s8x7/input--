@@ -373,11 +373,9 @@ static void gtp_touch_down(struct goodix_ts_data *ts, int id, int x, int y,
 	input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, w);
 	input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, w);
 	touch_cnt++;
-    if (touch_cnt == 100)
-    {
-        touch_cnt = 0;
+
         lidbg("%d[%d,%d];\n", id, x, y);
-    }
+   
 }
 
 /*******************************************************
@@ -428,7 +426,7 @@ static void goodix_ts_work_func(struct work_struct *work)
 	s32 i = 0;
 	int ret = -1;
 	struct goodix_ts_data *ts = NULL;
-
+	struct lidbg_ts_data *pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 #if GTP_SLIDE_WAKEUP
 	u8 doze_buf[3] = {0x81, 0x4B};
 #endif
@@ -599,7 +597,25 @@ static void goodix_ts_work_func(struct work_struct *work)
 			if (pre_pen == 1)
 				break;
 #endif
-			if (touch_index & (0x01<<i)) {
+						
+				pdata->x[i] = coor_data[pos + 1] |
+						coor_data[pos + 2] << 8;
+				pdata->y[i] = coor_data[pos + 3] |
+						coor_data[pos + 4] << 8;
+				pdata->w[i] = coor_data[pos + 5] |
+						coor_data[pos + 6] << 8;
+				pdata->id[i] = coor_data[pos] & 0x0F;
+				pos += 8;
+			}
+		pdata->touch_num = touch_num;
+		pdata->touch_index = touch_index;
+		pdata->pre_touch = &pre_touch;
+	//lidbg("touch_index = %d\n",touch_index);
+	
+	lidbg_touch_report(ts->input_dev,pdata);
+	}
+	/*
+	if (touch_index & (0x01<<i)) {
 				input_x = coor_data[pos + 1] |
 						coor_data[pos + 2] << 8;
 				input_y = coor_data[pos + 3] |
@@ -621,7 +637,7 @@ static void goodix_ts_work_func(struct work_struct *work)
 		}
 	}
 	input_sync(ts->input_dev);
-
+*/
 exit_work_func:
 	if (!ts->gtp_rawdiff_mode) {
 		ret = gtp_i2c_write(ts->client, end_cmd, 3);
@@ -1655,6 +1671,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 	u16 version_info;
 	int ret;
     client->addr=0x14;
+	struct lidbg_input_data *pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	lidbg("GTP I2C Address: 0x%02x\n", client->addr);
 	/*if (client->dev.of_node) {
 		pdata = devm_kzalloc(&client->dev,
@@ -1744,12 +1761,21 @@ static int goodix_ts_probe(struct i2c_client *client,
 		ts->abs_y_max = GTP_MAX_HEIGHT;
 		ts->int_trigger_type = GTP_INT_TRIGGER;
 	}
-
+/*
 	ret = gtp_request_input_dev(ts);
 	if (ret) {
 		dev_err(&client->dev, "GTP request input dev failed.\n");
 		goto exit_free_inputdev;
 	}
+	*/
+	pdata->abs_x_max = ts->abs_x_max;
+	pdata->abs_y_max = ts->abs_y_max;
+	ret = lidbg_init_input(&(ts->input_dev),pdata);
+	if (ret) {
+		dev_err(&client->dev, "GTP request input dev failed.\n");
+		goto exit_free_inputdev;
+	}
+	
 
 #if defined(CONFIG_FB)
 	ts->fb_notif.notifier_call = fb_notifier_callback;

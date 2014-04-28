@@ -49,6 +49,7 @@
 #include <linux/wait.h>
 #include <linux/poll.h>
 #include <linux/semaphore.h>
+#include <linux/input/mt.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #else
