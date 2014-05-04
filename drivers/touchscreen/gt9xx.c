@@ -597,6 +597,8 @@ static void goodix_ts_work_func(struct work_struct *work)
 			if (pre_pen == 1)
 				break;
 #endif
+				
+
 						
 				pdata->x[i] = coor_data[pos + 1] |
 						coor_data[pos + 2] << 8;
@@ -606,13 +608,17 @@ static void goodix_ts_work_func(struct work_struct *work)
 						coor_data[pos + 6] << 8;
 				pdata->id[i] = coor_data[pos] & 0x0F;
 				pos += 8;
+				#if GTP_CHANGE_X2Y
+				GTP_SWAP(pdata->x[i], pdata->y[i]);
+				#endif
 			}
 		pdata->touch_num = touch_num;
 		pdata->touch_index = touch_index;
 		pdata->pre_touch = &pre_touch;
 	//lidbg("touch_index = %d\n",touch_index);
 	
-	lidbg_touch_report(ts->input_dev,pdata);
+	lidbg_touch_report(pdata);
+	kfree(pdata);
 	}
 	/*
 	if (touch_index & (0x01<<i)) {
@@ -1761,16 +1767,22 @@ static int goodix_ts_probe(struct i2c_client *client,
 		ts->abs_y_max = GTP_MAX_HEIGHT;
 		ts->int_trigger_type = GTP_INT_TRIGGER;
 	}
-/*
-	ret = gtp_request_input_dev(ts);
+
+	/*ret = gtp_request_input_dev(ts);
 	if (ret) {
 		dev_err(&client->dev, "GTP request input dev failed.\n");
 		goto exit_free_inputdev;
-	}
-	*/
+	}*/
+	
 	pdata->abs_x_max = ts->abs_x_max;
 	pdata->abs_y_max = ts->abs_y_max;
-	ret = lidbg_init_input(&(ts->input_dev),pdata);
+	#if GTP_CHANGE_X2Y
+	GTP_SWAP(pdata->abs_x_max, pdata->abs_y_max);
+	#endif
+	ret = lidbg_init_input(pdata);
+	ts->input_dev = pdata->input_dev;
+	kfree(pdata);
+	
 	if (ret) {
 		dev_err(&client->dev, "GTP request input dev failed.\n");
 		goto exit_free_inputdev;

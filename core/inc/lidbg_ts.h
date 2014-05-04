@@ -20,10 +20,12 @@ struct lidbg_input_data
 {
 	u16 abs_x_max;
 	u16 abs_y_max;
+	struct input_dev *input_dev;
 };
+
 void lidbg_touch_main(int argc, char **argv);
-void lidbg_touch_report(struct input_dev * input_dev, struct lidbg_ts_data * pdata);
-int lidbg_init_input(struct input_dev **input_dev,struct lidbg_input_data *pinput);
+void lidbg_touch_report(struct lidbg_ts_data * pdata);
+int lidbg_init_input(struct lidbg_input_data *pinput);
 
 #endif
 

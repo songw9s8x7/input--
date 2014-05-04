@@ -1,89 +1,82 @@
 
 #include "lidbg.h"
-#include "../drivers/touchscreen/gt9xx.h"
-//#define LIDBG_MULTI_TOUCH_SUPPORT
 
+//#define LIDBG_MULTI_TOUCH_SUPPORT
+#define GTP_MAX_TOUCH	5
 
 #define TOUCH_X_MIN  (0)
 #define TOUCH_X_MAX  (RESOLUTION_X-1)
 #define TOUCH_Y_MIN  (0)
 #define TOUCH_Y_MAX  (RESOLUTION_Y-1)
 struct input_dev *input = NULL;
-
-int lidbg_init_input(struct input_dev **input_dev,struct lidbg_input_data *pinput)
+struct input_dev *input_dev = NULL;
+int lidbg_init_input(struct lidbg_input_data *pinput)
 {
     	int ret;
 	char phys[32];
 	lidbg("%s:----------------wsx-------------------\n",__FUNCTION__);
-	*input_dev = input_allocate_device();
+	input_dev = input_allocate_device();
 	if (input_dev == NULL) {
 		lidbg("Failed to allocate input device.\n");
 		return -ENOMEM;
 	}
-	(*input_dev)->evbit[0] =
+	input_dev->evbit[0] =
 		BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS) ; 
-	set_bit(BTN_TOOL_FINGER, (*input_dev)->keybit);
-	__set_bit(INPUT_PROP_DIRECT, (*input_dev)->propbit);
-	#if GTP_CHANGE_X2Y
-	GTP_SWAP(pinput->abs_x_max, pinput->abs_y_max);
-	#endif
-	input_mt_init_slots(*input_dev, 5);/* in case of "out of memory" */ 
-	input_set_abs_params(*input_dev, ABS_MT_POSITION_X,
+	set_bit(BTN_TOOL_FINGER, (input_dev)->keybit);
+	__set_bit(INPUT_PROP_DIRECT, (input_dev)->propbit);
+	
+	input_mt_init_slots(input_dev, 5);/* in case of "out of memory" */ 
+	input_set_abs_params(input_dev, ABS_MT_POSITION_X,
 				0, pinput->abs_x_max, 0, 0);
-	input_set_abs_params(*input_dev, ABS_MT_POSITION_Y,
+	input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
 				0, pinput->abs_y_max, 0, 0);
-	input_set_abs_params(*input_dev, ABS_MT_WIDTH_MAJOR,
+	input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR,
 				0, 255, 0, 0);
-	input_set_abs_params(*input_dev, ABS_MT_TOUCH_MAJOR,
+	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
 				0, 255, 0, 0);
-	input_set_abs_params(*input_dev, ABS_MT_TRACKING_ID,
+	input_set_abs_params(input_dev, ABS_MT_TRACKING_ID,
 				0, 255, 0, 0);
 	snprintf(phys, 32, "input/ts");
 	//strcpy(input_dev->name,"Goodix-CTP");
-	(*input_dev)->name = "Goodix-CTP";
-	(*input_dev)->phys = phys;
-	(*input_dev)->id.bustype = BUS_I2C;
-	(*input_dev)->id.vendor = 0xDEAD;
-	(*input_dev)->id.product = 0xBEEF;
-	(*input_dev)->id.version = 10427;
+	input_dev->name = "Goodix-CTP";
+	input_dev->phys = phys;
+	input_dev->id.bustype = BUS_I2C;
+	input_dev->id.vendor = 0xDEAD;
+	input_dev->id.product = 0xBEEF;
+	input_dev->id.version = 10427;
 	lidbg("before register\n");
-	ret = input_register_device(*input_dev);
+	ret = input_register_device(input_dev);
 
 	if (ret) {
 		lidbg("---------wsx------input device failed.\n");
-		input_free_device(*input_dev);
+		input_free_device(input_dev);
 		input_dev = NULL;
 		return ret;
 	}
 	lidbg("after register\n");
+	pinput->input_dev = input_dev;
 	return 0;
 
 }
 
-void lidbg_touch_report(struct input_dev *input_dev,struct lidbg_ts_data *pdata)
+void lidbg_touch_report(struct lidbg_ts_data *pdata)
 {
     	int i;
-	
+	lidbg("%s:-----------wsx-----------",__FUNCTION__);
 	for (i = 0; i < GTP_MAX_TOUCH; i++)  
     	{  
 		input_mt_slot(input_dev, pdata->id[i]);  
             if ((pdata->touch_index) & (0x01<<i)) 
-            	{  
-			#if GTP_CHANGE_X2Y
-			GTP_SWAP(pdata->x[i], pdata->y[i]);
-			#endif
-
-		   
-                      	input_mt_slot(input_dev, pdata->id[i]);
+            	{  	   
+                      input_mt_slot(input_dev, pdata->id[i]);
 		        input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
 		        input_report_abs(input_dev, ABS_MT_POSITION_X, pdata->x[i]);
 		        input_report_abs(input_dev, ABS_MT_POSITION_Y, pdata->y[i]);
 		        input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, pdata->w[i]);
-			input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, pdata->w[i]);
+			 input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, pdata->w[i]);
 		        lidbg("%d,%d[%d,%d];\n", pdata->touch_num,pdata->id[i], pdata->x[i], pdata->y[i]);
 			*(pdata->pre_touch) |= 0x01 << i;
-			pdata->touch_index |= (0x01 << pdata->id[i+1]);
-		      
+			pdata->touch_index |= (0x01 << pdata->id[i+1]);  
 			
         	}  
        		else  
